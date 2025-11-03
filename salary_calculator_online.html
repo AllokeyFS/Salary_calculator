@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Calculator</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Download = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        );
+
+        const Upload = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+        );
+
+        const Trash2 = () => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+        );
+
+        const Plus = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        );
+
+        const User = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+        );
+
+        const Save = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+        );
+
+        const SalaryCalculator = () => {
+            const [profiles, setProfiles] = useState([]);
+            const [currentProfile, setCurrentProfile] = useState(null);
+            const [showNewProfile, setShowNewProfile] = useState(false);
+            const [newProfileName, setNewProfileName] = useState('');
+            const [isSchengen, setIsSchengen] = useState(true);
+            const [workDays, setWorkDays] = useState([]);
+            const [editingDay, setEditingDay] = useState(null);
+            const [selectedMonth, setSelectedMonth] = useState('');
+            const [newDay, setNewDay] = useState({
+                date: '',
+                startTime: '',
+                endTime: '',
+                break1Start: '',
+                break1End: '',
+                break2Start: '',
+                break2End: '',
+                isHoliday: false,
+                isWeekend: false
+            });
+
+            useEffect(() => {
+                if (profiles.length === 0) {
+                    try {
+                        const savedData = localStorage.getItem('salaryCalculatorData');
+                        if (savedData) {
+                            const parsed = JSON.parse(savedData);
+                            if (parsed.profiles && parsed.profiles.length > 0) {
+                                setProfiles(parsed.profiles);
+                                if (parsed.currentProfileId) {
+                                    const profile = parsed.profiles.find(p => p.id === parsed.currentProfileId);
+                                    if (profile) {
+                                        setCurrentProfile(profile);
+                                        setWorkDays(profile.workDays || []);
+                                        setIsSchengen(profile.isSchengen);
+                                    }
+                                }
+                            } else {
+                                setShowNewProfile(true);
+                            }
+                        } else {
+                            setShowNewProfile(true);
+                        }
+                    } catch (e) {
+                        console.error('Error loading data:', e);
+                        setShowNewProfile(true);
+                    }
+                }
+            }, []);
+
+            useEffect(() => {
+                // Set current month as default when workDays change
+                if (workDays.length > 0 && !selectedMonth) {
+                    const latestDate = workDays[workDays.length - 1].date;
+                    if (latestDate) {
+                        setSelectedMonth(latestDate.substring(0, 7)); // YYYY-MM format
+                    }
+                }
+            }, [workDays]);
+
+            useEffect(() => {
+                if (profiles.length > 0) {
+                    try {
+                        const dataToSave = {
+                            profiles: profiles,
+                            currentProfileId: currentProfile?.id
+                        };
+                        localStorage.setItem('salaryCalculatorData', JSON.stringify(dataToSave));
+                    } catch (e) {
+                        console.error('Error saving data:', e);
+                    }
+                }
+            }, [profiles, currentProfile]);
+
+            const checkWeekend = (dateStr) => {
+                if (!dateStr) return false;
+                const date = new Date(dateStr + 'T00:00:00');
+                const day = date.getDay();
+                return day === 0 || day === 6;
+            };
+
+            const handleDateChange = (dateStr) => {
+                const isWeekendDay = checkWeekend(dateStr);
+                setNewDay({...newDay, date: dateStr, isWeekend: isWeekendDay});
+            };
+
+            const calculateHourlyRate = (monthlyHours) => {
+                if (monthlyHours < 40) return 1675;
+                if (monthlyHours <= 80) return 1795;
+                if (monthlyHours <= 100) return 1835;
+                if (monthlyHours <= 120) return 1885;
+                if (monthlyHours <= 150) return 1925;
+                return 1975;
+            };
+
+            const timeToMinutes = (time) => {
+                if (!time) return 0;
+                const [hours, minutes] = time.split(':').map(Number);
+                return hours * 60 + minutes;
+            };
+
+            const calculateBreakMinutes = (startTime, endTime, break1Start, break1End, break2Start, break2End) => {
+                let breakMinutes = 0;
+                
+                if (break1Start && break1End) {
+                    breakMinutes += timeToMinutes(break1End) - timeToMinutes(break1Start);
+                }
+                
+                if (break2Start && break2End) {
+                    breakMinutes += timeToMinutes(break2End) - timeToMinutes(break2Start);
+                }
+                
+                return breakMinutes;
+            };
+
+            const calculateDayEarnings = (day, totalMonthlyHours) => {
+                const startMinutes = timeToMinutes(day.startTime);
+                const endMinutes = timeToMinutes(day.endTime);
+                let totalMinutes = endMinutes - startMinutes;
+                
+                if (endMinutes < startMinutes) {
+                    totalMinutes += 24 * 60;
+                }
+                
+                const breakMinutes = calculateBreakMinutes(
+                    day.startTime, day.endTime,
+                    day.break1Start, day.break1End,
+                    day.break2Start, day.break2End
+                );
+                
+                const workedMinutes = totalMinutes - breakMinutes;
+                const workedHours = workedMinutes / 60;
+                
+                const baseRate = calculateHourlyRate(totalMonthlyHours);
+                
+                if (day.isHoliday) {
+                    const holidayRate = baseRate * 2;
+                    return workedHours * holidayRate;
+                }
+                
+                let earnings = 0;
+                
+                for (let i = 0; i < workedMinutes; i++) {
+                    const currentMinute = (startMinutes + i) % (24 * 60);
+                    const isBreak = (
+                        (day.break1Start && currentMinute >= timeToMinutes(day.break1Start) && currentMinute < timeToMinutes(day.break1End)) ||
+                        (day.break2Start && currentMinute >= timeToMinutes(day.break2Start) && currentMinute < timeToMinutes(day.break2End))
+                    );
+                    
+                    if (isBreak) continue;
+                    
+                    const currentHour = Math.floor(currentMinute / 60);
+                    let rate = baseRate;
+                    
+                    if (currentHour >= 22 || currentHour < 6) {
+                        rate = baseRate * 1.4;
+                    } else if (currentHour >= 18) {
+                        rate = baseRate * 1.3;
+                    }
+                    
+                    if (day.isWeekend) {
+                        rate = rate * 1.2;
+                    }
+                    
+                    earnings += rate / 60;
+                }
+                
+                return earnings;
+            };
+
+            const addWorkDay = () => {
+                if (!newDay.date || !newDay.startTime || !newDay.endTime) {
+                    alert('Please fill in date, start time, and end time');
+                    return;
+                }
+
+                let updatedWorkDays;
+                if (editingDay) {
+                    // Update existing day
+                    updatedWorkDays = workDays.map(day => 
+                        day.id === editingDay.id ? { ...newDay, id: editingDay.id } : day
+                    );
+                    setEditingDay(null);
+                } else {
+                    // Add new day
+                    updatedWorkDays = [...workDays, { ...newDay, id: Date.now() }];
+                }
+                
+                setWorkDays(updatedWorkDays);
+                
+                if (currentProfile) {
+                    const updatedProfiles = profiles.map(p => 
+                        p.id === currentProfile.id 
+                            ? { ...p, workDays: updatedWorkDays }
+                            : p
+                    );
+                    setProfiles(updatedProfiles);
+                }
+
+                setNewDay({
+                    date: '',
+                    startTime: '',
+                    endTime: '',
+                    break1Start: '',
+                    break1End: '',
+                    break2Start: '',
+                    break2End: '',
+                    isHoliday: false,
+                    isWeekend: false
+                });
+            };
+
+            const editWorkDay = (day) => {
+                setEditingDay(day);
+                setNewDay({
+                    date: day.date,
+                    startTime: day.startTime,
+                    endTime: day.endTime,
+                    break1Start: day.break1Start || '',
+                    break1End: day.break1End || '',
+                    break2Start: day.break2Start || '',
+                    break2End: day.break2End || '',
+                    isHoliday: day.isHoliday,
+                    isWeekend: day.isWeekend
+                });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const cancelEdit = () => {
+                setEditingDay(null);
+                setNewDay({
+                    date: '',
+                    startTime: '',
+                    endTime: '',
+                    break1Start: '',
+                    break1End: '',
+                    break2Start: '',
+                    break2End: '',
+                    isHoliday: false,
+                    isWeekend: false
+                });
+            };
+
+            const deleteWorkDay = (id) => {
+                const updatedWorkDays = workDays.filter(day => day.id !== id);
+                setWorkDays(updatedWorkDays);
+                
+                if (currentProfile) {
+                    const updatedProfiles = profiles.map(p => 
+                        p.id === currentProfile.id 
+                            ? { ...p, workDays: updatedWorkDays }
+                            : p
+                    );
+                    setProfiles(updatedProfiles);
+                }
+            };
+
+            const createProfile = () => {
+                if (!newProfileName.trim()) {
+                    alert('Please enter a profile name');
+                    return;
+                }
+
+                const newProfile = {
+                    id: Date.now(),
+                    name: newProfileName,
+                    isSchengen: isSchengen,
+                    workDays: []
+                };
+
+                setProfiles([...profiles, newProfile]);
+                setCurrentProfile(newProfile);
+                setWorkDays([]);
+                setNewProfileName('');
+                setShowNewProfile(false);
+            };
+
+            const switchProfile = (profile) => {
+                setCurrentProfile(profile);
+                setWorkDays(profile.workDays || []);
+                setIsSchengen(profile.isSchengen);
+            };
+
+            const updateProfileTax = () => {
+                if (currentProfile) {
+                    const updatedProfiles = profiles.map(p => 
+                        p.id === currentProfile.id 
+                            ? { ...p, isSchengen: isSchengen }
+                            : p
+                    );
+                    setProfiles(updatedProfiles);
+                    setCurrentProfile({ ...currentProfile, isSchengen: isSchengen });
+                }
+            };
+
+            const exportData = () => {
+                const dataToExport = {
+                    profiles: profiles,
+                    currentProfileId: currentProfile?.id,
+                    exportDate: new Date().toISOString()
+                };
+                const dataStr = JSON.stringify(dataToExport, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `salary-data-${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const importData = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        setProfiles(imported.profiles || []);
+                        if (imported.currentProfileId) {
+                            const profile = imported.profiles.find(p => p.id === imported.currentProfileId);
+                            if (profile) {
+                                setCurrentProfile(profile);
+                                setWorkDays(profile.workDays || []);
+                                setIsSchengen(profile.isSchengen);
+                            }
+                        }
+                        alert('Data imported successfully!');
+                    } catch (err) {
+                        alert('Error importing data. Please check the file format.');
+                        console.error('Import error:', err);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
+            const calculateTotals = () => {
+                // Filter work days by selected month
+                const filteredDays = selectedMonth 
+                    ? workDays.filter(day => day.date.startsWith(selectedMonth))
+                    : workDays;
+
+                // First pass: calculate total hours for the filtered month
+                let totalMonthlyHours = 0;
+                filteredDays.forEach(day => {
+                    const startMinutes = timeToMinutes(day.startTime);
+                    const endMinutes = timeToMinutes(day.endTime);
+                    let totalMinutes = endMinutes - startMinutes;
+                    if (endMinutes < startMinutes) totalMinutes += 24 * 60;
+                    
+                    const breakMinutes = calculateBreakMinutes(
+                        day.startTime, day.endTime,
+                        day.break1Start, day.break1End,
+                        day.break2Start, day.break2End
+                    );
+                    
+                    totalMonthlyHours += (totalMinutes - breakMinutes) / 60;
+                });
+
+                const currentBaseRate = calculateHourlyRate(totalMonthlyHours);
+
+                // Second pass: calculate earnings using the total monthly hours rate
+                const daysWithEarnings = filteredDays.map(day => {
+                    const startMinutes = timeToMinutes(day.startTime);
+                    const endMinutes = timeToMinutes(day.endTime);
+                    let totalMinutes = endMinutes - startMinutes;
+                    if (endMinutes < startMinutes) totalMinutes += 24 * 60;
+                    
+                    const breakMinutes = calculateBreakMinutes(
+                        day.startTime, day.endTime,
+                        day.break1Start, day.break1End,
+                        day.break2Start, day.break2End
+                    );
+                    
+                    const workedHours = (totalMinutes - breakMinutes) / 60;
+                    const earnings = calculateDayEarnings(day, totalMonthlyHours);
+                    
+                    return { ...day, earnings, workedHours, baseRateUsed: currentBaseRate };
+                });
+
+                const totalGross = daysWithEarnings.reduce((sum, day) => sum + day.earnings, 0);
+                const totalNet = isSchengen ? totalGross : totalGross * 0.85;
+                const totalHours = totalMonthlyHours;
+
+                // Get available months from all work days
+                const availableMonths = [...new Set(workDays.map(day => day.date.substring(0, 7)))].sort().reverse();
+
+                return { daysWithEarnings, totalGross, totalNet, totalHours, currentBaseRate, availableMonths };
+            };
+
+            const { daysWithEarnings, totalGross, totalNet, totalHours, currentBaseRate, availableMonths } = calculateTotals();
+
+            if (showNewProfile || profiles.length === 0) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+                        <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+                            <h2 className="text-2xl font-bold mb-6 text-gray-800">Create Profile</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Profile Name</label>
+                                    <input
+                                        type="text"
+                                        value={newProfileName}
+                                        onChange={(e) => setNewProfileName(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter your name"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={isSchengen}
+                                            onChange={(e) => setIsSchengen(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Schengen Citizen (No Tax)</span>
+                                    </label>
+                                    {!isSchengen && (
+                                        <p className="text-xs text-gray-500 mt-1 ml-6">15% tax will be deducted</p>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={createProfile}
+                                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Create Profile
+                                </button>
+                                {profiles.length > 0 && (
+                                    <button
+                                        onClick={() => setShowNewProfile(false)}
+                                        className="w-full bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                                <h1 className="text-3xl font-bold text-gray-800">Salary Calculator</h1>
+                                <div className="flex gap-2 flex-wrap">
+                                    <button
+                                        onClick={exportData}
+                                        className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                                        title="Export data to file"
+                                    >
+                                        <Download />
+                                        Export
+                                    </button>
+                                    <label className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors cursor-pointer">
+                                        <Upload />
+                                        Import
+                                        <input
+                                            type="file"
+                                            accept=".json"
+                                            onChange={importData}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    <button
+                                        onClick={() => setShowNewProfile(true)}
+                                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                                    >
+                                        <Plus />
+                                        New Profile
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Active Profile</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {profiles.map(profile => (
+                                        <button
+                                            key={profile.id}
+                                            onClick={() => switchProfile(profile)}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                                                currentProfile?.id === profile.id
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            <User />
+                                            {profile.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center justify-between flex-wrap gap-4">
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={isSchengen}
+                                            onChange={(e) => setIsSchengen(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Schengen Citizen</span>
+                                    </label>
+                                    <button
+                                        onClick={updateProfileTax}
+                                        className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                                    >
+                                        <Save />
+                                        Save Tax Status
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <h2 className="text-xl font-bold mb-4 text-gray-800">
+                                {editingDay ? 'Edit Work Day' : 'Add Work Day'}
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={newDay.date}
+                                        onChange={(e) => handleDateChange(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                                    <input
+                                        type="time"
+                                        value={newDay.startTime}
+                                        onChange={(e) => setNewDay({...newDay, startTime: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                                    <input
+                                        type="time"
+                                        value={newDay.endTime}
+                                        onChange={(e) => setNewDay({...newDay, endTime: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div className="flex items-end gap-2 flex-wrap">
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={newDay.isHoliday}
+                                            onChange={(e) => setNewDay({...newDay, isHoliday: e.target.checked})}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Holiday</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={newDay.isWeekend}
+                                            onChange={(e) => setNewDay({...newDay, isWeekend: e.target.checked})}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Weekend</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="border border-gray-200 rounded-lg p-4">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Break 1 (20 min)</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-1">Start</label>
+                                            <input
+                                                type="time"
+                                                value={newDay.break1Start}
+                                                onChange={(e) => setNewDay({...newDay, break1Start: e.target.value})}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-1">End</label>
+                                            <input
+                                                type="time"
+                                                value={newDay.break1End}
+                                                onChange={(e) => setNewDay({...newDay, break1End: e.target.value})}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="border border-gray-200 rounded-lg p-4">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Break 2 (25 min)</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-1">Start</label>
+                                            <input
+                                                type="time"
+                                                value={newDay.break2Start}
+                                                onChange={(e) => setNewDay({...newDay, break2Start: e.target.value})}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-1">End</label>
+                                            <input
+                                                type="time"
+                                                value={newDay.break2End}
+                                                onChange={(e) => setNewDay({...newDay, break2End: e.target.value})}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={addWorkDay}
+                                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                                {editingDay ? 'Update Work Day' : 'Add Work Day'}
+                            </button>
+                            {editingDay && (
+                                <button
+                                    onClick={cancelEdit}
+                                    className="w-full mt-2 bg-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                                >
+                                    Cancel Edit
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                                <h2 className="text-xl font-bold text-gray-800">Work Days</h2>
+                                <div className="flex items-center gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
+                                        <select
+                                            value={selectedMonth}
+                                            onChange={(e) => setSelectedMonth(e.target.value)}
+                                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        >
+                                            <option value="">All Months</option>
+                                            {availableMonths.map(month => (
+                                                <option key={month} value={month}>
+                                                    {new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                        Current Base Rate: <span className="font-bold text-blue-600">{currentBaseRate} Ft/hour</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Date</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Start</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">End</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Break 1</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Break 2</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Hours</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Base Rate</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-700">Type</th>
+                                            <th className="px-4 py-3 text-right font-medium text-gray-700">Earnings</th>
+                                            <th className="px-4 py-3 text-center font-medium text-gray-700">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {daysWithEarnings.map(day => (
+                                            <tr key={day.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3">{day.date}</td>
+                                                <td className="px-4 py-3">{day.startTime}</td>
+                                                <td className="px-4 py-3">{day.endTime}</td>
+                                                <td className="px-4 py-3 text-xs">
+                                                    {day.break1Start && day.break1End ? `${day.break1Start}-${day.break1End}` : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs">
+                                                    {day.break2Start && day.break2End ? `${day.break2Start}-${day.break2End}` : '-'}
+                                                </td>
+                                                <td className="px-4 py-3">{day.workedHours.toFixed(2)}h</td>
+                                                <td className="px-4 py-3 font-medium text-gray-700">{day.baseRateUsed} Ft</td>
+                                                <td className="px-4 py-3">
+                                                    {day.isHoliday && <span className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded mr-1">Holiday</span>}
+                                                    {day.isWeekend && <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Weekend</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium">{Math.round(day.earnings).toLocaleString()} Ft</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <div className="flex justify-center gap-2">
+                                                        <button
+                                                            onClick={() => editWorkDay(day)}
+                                                            className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteWorkDay(day.id)}
+                                                            className="text-red-600 hover:text-red-800 transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Total Hours</p>
+                                        <p className="text-2xl font-bold text-gray-800">{totalHours.toFixed(2)}h</p>
+                                    </div>
+                                    <div className="bg-green-50 p-4 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Gross Earnings</p>
+                                        <p className="text-2xl font-bold text-gray-800">{Math.round(totalGross).toLocaleString()} Ft</p>
+                                    </div>
+                                    <div className="bg-indigo-50 p-4 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Net Earnings {!isSchengen && '(after 15% tax)'}</p>
+                                        <p className="text-2xl font-bold text-gray-800">{Math.round(totalNet).toLocaleString()} Ft</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<SalaryCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
